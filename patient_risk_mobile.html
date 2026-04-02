@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Patient Risk Score</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#0d1117;--surf:#161b27;--surf2:#1e2535;--surf3:#242e42;
+  --rule:#2a3347;--ink:#e2e8f0;--ink2:#94a3b8;--muted:#4a5568;
+  --blue:#3b82f6;--blue-s:rgba(59,130,246,.15);
+  --green:#10b981;--green-s:rgba(16,185,129,.15);
+  --yellow:#f59e0b;--yellow-s:rgba(245,158,11,.15);
+  --orange:#f97316;--orange-s:rgba(249,115,22,.15);
+  --red:#ef4444;--red-s:rgba(239,68,68,.15);
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;font-size:14px;}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--surf);border-bottom:1px solid var(--rule);height:52px;padding:0 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:100;}
+.topbar-left{display:flex;align-items:center;gap:10px;}
+.badge-wrap{width:34px;height:34px;flex-shrink:0;}
+.badge-wrap svg{width:34px;height:34px;}
+.app-name{font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink);line-height:1.2;}
+.app-sub{font-size:9px;font-weight:400;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;}
+.btn-rst{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);background:transparent;border:1px solid var(--rule);border-radius:3px;padding:5px 10px;cursor:pointer;}
+
+/* ── SCORE TABS ── */
+.score-bar{background:var(--surf);border-bottom:1px solid var(--rule);padding:0 12px;display:flex;overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+.score-bar::-webkit-scrollbar{display:none;}
+.stab{font-family:'IBM Plex Sans',sans-serif;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:10px 12px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;}
+.stab.on{color:var(--blue);border-bottom-color:var(--blue);}
+.stab-n{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;background:var(--blue-s);color:var(--blue);padding:1px 5px;border-radius:7px;display:none;}
+.stab.scored .stab-n{display:inline;}
+
+/* ── SCROLL BODY ── */
+.scroll-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--safe-b) + 88px);}
+
+/* ── SCORE HEADER ── */
+.s-head{padding:18px 14px 12px;}
+.s-eye{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--blue);margin-bottom:5px;}
+.s-name{font-size:19px;font-weight:600;margin-bottom:4px;color:var(--ink);line-height:1.2;}
+.s-desc{font-size:12px;color:var(--ink2);line-height:1.5;padding-bottom:12px;border-bottom:1px solid var(--rule);}
+
+/* ── SECTION LABEL ── */
+.slbl{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding:14px 14px 7px;display:flex;align-items:center;gap:8px;}
+.slbl::after{content:'';flex:1;height:1px;background:var(--rule);}
+
+/* ── CRITERIA ── */
+.crit-wrap{padding:0 10px;display:flex;flex-direction:column;gap:5px;}
+.crit{display:flex;align-items:stretch;border:1px solid var(--rule);border-radius:8px;background:var(--surf);cursor:pointer;overflow:hidden;user-select:none;-webkit-user-select:none;min-height:50px;transition:border-color .12s,background .12s;}
+.crit:active{opacity:.85;}
+.crit.on{border-color:var(--blue);background:var(--blue-s);}
+.crit.on .c-pts{background:var(--blue);color:#fff;border-right-color:var(--blue);}
+.c-pts{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;width:44px;min-width:44px;display:flex;align-items:center;justify-content:center;background:var(--surf2);color:var(--ink2);border-right:1px solid var(--rule);transition:all .12s;}
+.c-body{flex:1;padding:10px 12px;}
+.c-name{font-size:13px;font-weight:500;color:var(--ink);line-height:1.3;}
+.c-sub{font-size:11px;color:var(--muted);margin-top:2px;font-style:italic;}
+.c-chk{width:36px;display:flex;align-items:center;justify-content:center;}
+.ck{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--rule);display:flex;align-items:center;justify-content:center;transition:all .12s;}
+.crit.on .ck{background:var(--blue);border-color:var(--blue);}
+.ck svg{display:none;width:9px;height:9px;}
+.crit.on .ck svg{display:block;}
+
+/* ── AGE RANGE SELECTOR ── */
+.age-wrap{margin:0 10px 5px;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surf);}
+.age-top{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--rule);}
+.age-ico{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;width:44px;min-width:44px;text-align:center;color:var(--ink2);}
+.age-lbl{flex:1;font-size:13px;font-weight:500;color:var(--ink);}
+.age-pts{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-s);padding:3px 9px;border-radius:4px;min-width:38px;text-align:center;}
+.age-pts.zero{color:var(--muted);background:var(--surf2);}
+.age-opts{display:flex;}
+.age-opt{flex:1;text-align:center;padding:8px 4px;font-size:11px;font-weight:500;color:var(--ink2);cursor:pointer;border-right:1px solid var(--rule);transition:background .12s;user-select:none;-webkit-user-select:none;line-height:1.3;}
+.age-opt:last-child{border-right:none;}
+.age-opt:active{background:var(--surf2);}
+.age-opt.on{background:var(--blue-s);color:var(--blue);font-weight:600;}
+.age-opt .sub{font-size:9px;color:var(--muted);display:block;margin-top:1px;}
+.age-opt.on .sub{color:var(--blue);opacity:.8;}
+
+/* ── BARTHEL ── */
+.b-wrap{padding:0 10px;display:flex;flex-direction:column;gap:5px;}
+.bblk{border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surf);}
+.bhdr{padding:9px 12px;background:var(--surf2);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;}
+.bhn{font-size:13px;font-weight:600;color:var(--ink);}
+.bpill{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:var(--blue);background:var(--blue-s);padding:2px 7px;border-radius:4px;}
+.bopt{display:flex;align-items:center;gap:9px;padding:9px 12px;border-top:1px solid var(--rule);cursor:pointer;user-select:none;-webkit-user-select:none;}
+.bopt:active{background:var(--surf2);}
+.bopt.on{background:var(--blue-s);}
+.brad{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--rule);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.bopt.on .brad{border-color:var(--blue);}
+.bdot{width:6px;height:6px;border-radius:50%;background:var(--blue);display:none;}
+.bopt.on .bdot{display:block;}
+.botxt{flex:1;font-size:12px;color:var(--ink2);line-height:1.3;}
+.bop{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);}
+
+/* ── CALCULATOR ── */
+.nrow{display:flex;align-items:center;border:1px solid var(--rule);border-radius:8px;background:var(--surf);padding:10px 12px;margin:0 10px 5px;gap:10px;}
+.nlbl{flex:1;font-size:13px;font-weight:500;color:var(--ink);}
+.nfld{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;width:80px;padding:5px 8px;border:1px solid var(--rule);border-radius:5px;background:var(--surf2);color:var(--ink);text-align:right;outline:none;}
+.nfld:focus{border-color:var(--blue);}
+.nunit{font-size:11px;color:var(--muted);white-space:nowrap;}
+
+/* ── STICKY RESULT ── */
+.res-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surf);border-top:1px solid var(--rule);padding:10px 14px calc(var(--safe-b) + 10px);z-index:200;}
+.res-collapsed{display:flex;align-items:center;gap:10px;cursor:pointer;}
+.res-score{font-size:28px;font-weight:300;color:var(--ink);line-height:1;letter-spacing:-.02em;}
+.res-max{font-size:13px;color:var(--muted);}
+.res-pill{padding:4px 10px;border-radius:12px;font-size:11px;font-weight:600;}
+.res-chevron{margin-left:auto;color:var(--muted);font-size:16px;transition:transform .2s;}
+.res-chevron.open{transform:rotate(180deg);}
+.res-detail{display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--rule);}
+.res-detail.open{display:block;}
+.res-bar-wrap{height:3px;background:var(--rule);border-radius:2px;margin-bottom:10px;overflow:hidden;}
+.res-bar-fill{height:100%;border-radius:2px;transition:width .4s;}
+.risk-row{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:7px;margin-bottom:8px;}
+.rdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.rlbl{font-size:13px;font-weight:600;flex:1;}
+.rpct{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;}
+.itbl{border:1px solid var(--rule);border-radius:7px;overflow:hidden;margin-bottom:8px;}
+.ittl{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:6px 10px;background:var(--surf2);border-bottom:1px solid var(--rule);}
+.irow{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--rule);font-size:11px;}
+.irow:last-child{border-bottom:none;}
+.irow.cur{background:var(--blue-s);}
+.irng{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);}
+.irisk{font-weight:600;color:var(--ink);}
+.ipct{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--ink2);}
+.recbox{border-radius:7px;padding:11px 12px;border:1px solid;margin-bottom:8px;}
+.rectitle{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px;}
+.rectxt{font-size:12px;line-height:1.65;color:var(--ink2);}
+.disc{font-size:10px;color:var(--muted);line-height:1.6;padding:8px 10px;border-radius:6px;background:var(--surf2);border:1px solid var(--rule);}
+
+/* calc result panel */
+.calcres{border:1px solid var(--rule);border-radius:7px;overflow:hidden;margin-bottom:8px;}
+.crtitle{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:6px 10px;background:var(--surf2);border-bottom:1px solid var(--rule);}
+.crval{font-size:38px;font-weight:300;text-align:center;padding:12px;line-height:1;letter-spacing:-.02em;color:var(--ink);}
+.crunit{font-size:12px;color:var(--muted);}
+.crint{padding:0 12px 12px;font-size:12px;text-align:center;}
+
+/* colors */
+.dl{background:var(--green);} .tl{color:var(--green);} .bgl{background:var(--green-s);border-color:rgba(16,185,129,.3)!important;}
+.dm{background:var(--yellow);}.tm{color:var(--yellow);}.bgm{background:var(--yellow-s);border-color:rgba(245,158,11,.3)!important;}
+.dh{background:var(--orange);}.th{color:var(--orange);}.bgh{background:var(--orange-s);border-color:rgba(249,115,22,.3)!important;}
+.dv{background:var(--red);}.tv{color:var(--red);}.bgv{background:var(--red-s);border-color:rgba(239,68,68,.3)!important;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <!-- ALEST BADGE — Circle -->
+    <div class="badge-wrap">
+      <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="17" cy="17" r="16" fill="#111827"/>
+        <circle cx="17" cy="17" r="16" fill="none" stroke="#CC785C" stroke-width="1.2"/>
+        <!-- Claude head -->
+        <ellipse cx="17" cy="11.5" rx="7" ry="6.2" fill="#CC785C"/>
+        <ellipse cx="10.2" cy="11.8" rx="1.8" ry="2.5" fill="#CC785C"/>
+        <ellipse cx="10.2" cy="11.8" rx="0.9" ry="1.4" fill="#b86848"/>
+        <ellipse cx="23.8" cy="11.8" rx="1.8" ry="2.5" fill="#CC785C"/>
+        <ellipse cx="23.8" cy="11.8" rx="0.9" ry="1.4" fill="#b86848"/>
+        <rect x="15.1" y="16.8" width="3.8" height="2.8" rx="1" fill="#CC785C"/>
+        <ellipse cx="14.7" cy="10.6" rx="1.1" ry="1.3" fill="#111827"/>
+        <ellipse cx="19.3" cy="10.6" rx="1.1" ry="1.3" fill="#111827"/>
+        <circle cx="15.1" cy="10.2" r="0.4" fill="white" opacity="0.6"/>
+        <circle cx="19.7" cy="10.2" r="0.4" fill="white" opacity="0.6"/>
+        <path d="M15.8 13.2 Q17 14 18.2 13.2" fill="none" stroke="#111827" stroke-width="0.7" stroke-linecap="round"/>
+        <!-- Apron -->
+        <path d="M11.2 19.2 Q10.4 20.4 10.4 22 L9.8 29.2 Q10.4 31.2 17 31.4 Q23.6 31.2 24.2 29.2 L23.6 22 Q23.6 20.4 22.8 19.2 Q20.4 20.8 17 20.8 Q13.6 20.8 11.2 19.2 Z" fill="white"/>
+        <!-- Bib -->
+        <path d="M13.4 19.2 Q17 21.4 20.6 19.2 L20 22.8 Q17 23.8 14 22.8 Z" fill="#ededed"/>
+        <!-- Neck strap -->
+        <path d="M14.2 18.8 Q17 17.2 19.8 18.8" fill="none" stroke="#d0d0d0" stroke-width="0.9" stroke-linecap="round"/>
+        <!-- Center seam -->
+        <line x1="17" y1="22.8" x2="17" y2="31.2" stroke="#e8e8e8" stroke-width="0.5"/>
+        <!-- ALEST -->
+        <text font-family="system-ui,sans-serif" font-size="4.2" font-weight="700" fill="#1d4ed8" x="17" y="22.2" text-anchor="middle" letter-spacing="0.5">ALEST</text>
+        <!-- 2 vertical buttons -->
+        <circle cx="17" cy="24.6" r="1" fill="#d8d8d8" stroke="#bbb" stroke-width="0.4"/>
+        <circle cx="17" cy="27.2" r="1" fill="#d8d8d8" stroke="#bbb" stroke-width="0.4"/>
+      </svg>
+    </div>
+    <div>
+      <div class="app-name">Patient Risk Score</div>
+      <div class="app-sub">Clinical Decision Support</div>
+    </div>
+  </div>
+  <button class="btn-rst" onclick="reset()">↺ Reset</button>
+</div>
+
+<div class="score-bar" id="scoreBar"></div>
+<div class="scroll-body" id="scrollBody"></div>
+
+<!-- Sticky result -->
+<div class="res-bar" id="resBar">
+  <div class="res-collapsed" onclick="toggleExp()">
+    <div style="display:flex;align-items:baseline;gap:3px">
+      <span class="res-score" id="resN">–</span>
+      <span class="res-max" id="resMax"></span>
+    </div>
+    <span class="res-pill" id="resPill"></span>
+    <span class="res-chevron" id="resChev">▲</span>
+  </div>
+  <div class="res-detail" id="resDetail"></div>
+</div>
+
+<script>
+const AGE_RANGES={
+  geneva:[
+    {lbl:'< 60',sub:'yrs',pts:0,id:'ga0'},
+    {lbl:'60–79',sub:'yrs',pts:1,id:'ga1'},
+    {lbl:'≥ 80',sub:'yrs',pts:1,id:'ga2'},
+  ],
+  caprini:[
+    {lbl:'≤ 40',sub:'yrs',pts:0,id:'ca0'},
+    {lbl:'41–60',sub:'yrs',pts:1,id:'ca1'},
+    {lbl:'61–74',sub:'yrs',pts:2,id:'ca2'},
+    {lbl:'≥ 75',sub:'yrs',pts:3,id:'ca3'},
+  ],
+  improve:[
+    {lbl:'< 40',sub:'yrs',pts:0,id:'ia0'},
+    {lbl:'40–84',sub:'yrs',pts:1.5,id:'ia1'},
+    {lbl:'≥ 85',sub:'yrs',pts:3.5,id:'ia2'},
+  ],
+  cg:[
+    {lbl:'18–39',sub:'yrs',pts:null,id:'cga0'},
+    {lbl:'40–59',sub:'yrs',pts:null,id:'cga1'},
+    {lbl:'60–74',sub:'yrs',pts:null,id:'cga2'},
+    {lbl:'75–89',sub:'yrs',pts:null,id:'cga3'},
+    {lbl:'≥ 90',sub:'yrs',pts:null,id:'cga4'},
+  ],
+  mdrd:[
+    {lbl:'18–39',sub:'yrs',pts:null,id:'mra0'},
+    {lbl:'40–59',sub:'yrs',pts:null,id:'mra1'},
+    {lbl:'60–74',sub:'yrs',pts:null,id:'mra2'},
+    {lbl:'75–89',sub:'yrs',pts:null,id:'mra3'},
+    {lbl:'≥ 90',sub:'yrs',pts:null,id:'mra4'},
+  ],
+};
+const AGE_VAL={ga0:50,ga1:70,ga2:82,ca0:30,ca1:50,ca2:67,ca3:78,ia0:30,ia1:60,ia2:87,cga0:28,cga1:50,cga2:67,cga3:82,cga4:92,mra0:28,mra1:50,mra2:67,mra3:82,mra4:92};
+
+const S={
+  geneva:{tab:'Geneva VTE',eye:'VTE Prophylaxis',name:'Geneva Risk Score',desc:'VTE risk in hospitalised medical patients. Score ≥ 3 = high risk.',kind:'age_cb',max:20,
+    cr:[{id:'g1',n:'Cardiac failure',p:2},{id:'g2',n:'Respiratory failure',p:2},{id:'g3',n:'Recent stroke',s:'Within 3 months',p:2},{id:'g4',n:'Recent myocardial infarction',s:'Within 3 months',p:2},{id:'g5',n:'Acute infection / sepsis',p:2},{id:'g6',n:'Acute rheumatological disease',p:2},{id:'g7',n:'Active malignancy',p:2},{id:'g8',n:'Myeloproliferative syndrome',p:2},{id:'g9',n:'Nephrotic syndrome',p:2},{id:'g10',n:'History of DVT / PE',p:2},{id:'g11',n:'Known thrombophilia',p:2},{id:'g14',n:'Immobility > 72 hours',s:'Bed rest or reduced mobility',p:1},{id:'g15',n:'Obesity (BMI ≥ 30)',p:1},{id:'g16',n:'Varicose veins / CVI',p:1},{id:'g17',n:'Hormone therapy / OCP',p:1},{id:'g18',n:'Recent trauma or surgery',s:'Within last month',p:1},{id:'g19',n:'Pregnancy / postpartum',p:1}],
+    interp(s){return s<3?'l':'h';},
+    lv:[{k:'l',lbl:'Low VTE risk',pr:'<1%',r:'0–2'},{k:'h',lbl:'High VTE risk',pr:'≈3–4%',r:'≥3'}],
+    rec:{l:'Pharmacological prophylaxis not recommended. Encourage mobilisation.',h:'LMWH recommended unless contraindicated. Assess bleeding risk (IMPROVE).'}},
+  caprini:{tab:'Caprini',eye:'VTE — Surgical',name:'Caprini Risk Score',desc:'VTE risk in surgical patients. Points 1–5 per risk factor.',kind:'age_sec',max:40,
+    sec:[
+      {lbl:'1 point each',cr:[{id:'c2',n:'Minor surgery < 45 min',p:1},{id:'c3',n:'History of minor surgery',p:1},{id:'c4',n:'Varicose veins',p:1},{id:'c5',n:'Inflammatory bowel disease',p:1},{id:'c6',n:'Leg swelling / oedema',p:1},{id:'c7',n:'Obesity (BMI > 25)',p:1},{id:'c8',n:'Acute MI',s:'Within last month',p:1},{id:'c9',n:'Congestive heart failure',s:'Within last month',p:1},{id:'c10',n:'Sepsis',s:'Within last month',p:1},{id:'c11',n:'Serious pneumonia',s:'Within last month',p:1},{id:'c12',n:'Bed rest > 72 h (pre-op)',p:1},{id:'c13',n:'History of malignancy',p:1},{id:'c14',n:'OCP / HRT',p:1},{id:'c15',n:'Pregnancy / postpartum',s:'Within last month',p:1},{id:'c16',n:'Stillbirth / recurrent miscarriage',p:1},{id:'c17',n:'Immobilised limb (cast)',p:1}]},
+      {lbl:'2 points each',cr:[{id:'c19',n:'Arthroplasty / major orthopaedic surgery',p:2},{id:'c20',n:'Laparoscopic surgery > 45 min',p:2},{id:'c21',n:'Active malignancy',p:2},{id:'c22',n:'Reduced mobility > 72 h',p:2},{id:'c23',n:'Central venous catheter',p:2}]},
+      {lbl:'3 points each',cr:[{id:'c25',n:'History of DVT / PE',p:3},{id:'c26',n:'Family history of VTE',p:3},{id:'c27',n:'Factor V Leiden',p:3},{id:'c28',n:'Prothrombin G20210A',p:3},{id:'c29',n:'Elevated homocysteine',p:3},{id:'c30',n:'Antiphospholipid syndrome',p:3},{id:'c31',n:'Protein C or S deficiency',p:3},{id:'c32',n:'Antithrombin III deficiency',p:3}]},
+      {lbl:'5 points',cr:[{id:'c33',n:'Stroke / paraplegia',s:'Within last month',p:5},{id:'c34',n:'Multiple trauma',s:'Within last month',p:5},{id:'c35',n:'Hip / pelvis / femur fracture',s:'Within last month',p:5},{id:'c36',n:'Elective hip or knee arthroplasty',p:5}]}],
+    interp(s){if(s<=1)return'l';if(s<=2)return'm';if(s<=4)return'h';return'v';},
+    lv:[{k:'l',lbl:'Very low',pr:'<0.5%',r:'0–1'},{k:'m',lbl:'Low',pr:'~1.5%',r:'2'},{k:'h',lbl:'Moderate',pr:'~3%',r:'3–4'},{k:'v',lbl:'High',pr:'~6%+',r:'≥5'}],
+    rec:{l:'Early mobilisation. Mechanical prophylaxis if indicated.',m:'Mechanical prophylaxis (IPC).',h:'LMWH/LDUH + mechanical (IPC).',v:'Pharmacological + mechanical. Consider extended therapy 28–35 days.'}},
+  wells:{tab:'Wells PE',eye:'Pulmonary Embolism',name:'Wells Criteria — PE',desc:'Pre-test probability of pulmonary embolism.',kind:'cb',max:12.5,
+    cr:[{id:'w1',n:'Clinical signs/symptoms of DVT',s:'Swelling, redness, tenderness',p:3},{id:'w2',n:'PE #1 diagnosis or equally likely',p:3},{id:'w3',n:'Heart rate > 100 bpm',p:1.5},{id:'w4',n:'Immobilisation ≥ 3 days or surgery within 4 weeks',p:1.5},{id:'w5',n:'Previous DVT or PE',p:1.5},{id:'w6',n:'Haemoptysis',p:1},{id:'w7',n:'Active malignancy',s:'Treatment within 6 months or palliative',p:1}],
+    interp(s){if(s<2)return'l';if(s<6)return'm';return'h';},
+    lv:[{k:'l',lbl:'Low probability',pr:'~3.6%',r:'<2'},{k:'m',lbl:'Moderate probability',pr:'~20.5%',r:'2–5.9'},{k:'h',lbl:'High probability',pr:'~66.7%',r:'≥6'}],
+    rec:{l:'D-Dimer. If negative → PE excluded.',m:'D-Dimer or CTPA. If positive → CTPA.',h:'Immediate CTPA. Consider anticoagulation pending results.'}},
+  improve:{tab:'IMPROVE',eye:'Bleeding Risk',name:'IMPROVE Bleeding Score',desc:'In-hospital bleeding risk. Score ≥ 7 = increased risk.',kind:'age_sec',max:30.5,
+    sec:[{lbl:'Risk factors',cr:[{id:'i1',n:'Active gastroduodenal ulcer',p:4.5},{id:'i2',n:'Prior bleeding within 3 months',p:4},{id:'i3',n:'Platelets < 50 × 10⁹/L',p:4},{id:'i5',n:'Hepatic failure (INR > 1.5)',p:2.5},{id:'i6',n:'Severe renal failure',s:'GFR < 30 mL/min/m²',p:2.5},{id:'i7',n:'ICU / CCU admission',p:2.5},{id:'i8',n:'Central venous catheter',p:2},{id:'i9',n:'Rheumatic disease',p:2},{id:'i10',n:'Active malignancy',p:2},{id:'i12',n:'Moderate renal failure',s:'GFR 30–59 mL/min/m²',p:1},{id:'i13',n:'Male sex',p:1}]}],
+    interp(s){return s<7?'l':'h';},
+    lv:[{k:'l',lbl:'Low bleeding risk',pr:'<1%',r:'<7'},{k:'h',lbl:'High bleeding risk',pr:'≥1%',r:'≥7'}],
+    rec:{l:'Pharmacological VTE prophylaxis permitted if indicated.',h:'High bleeding risk. Consider mechanical prophylaxis (IPC) over pharmacological.'}},
+  barthel:{tab:'Barthel',eye:'Functional Status',name:'Barthel Index',desc:'Functional independence in ADL. Range 0–100.',kind:'barthel',max:100,
+    items:[
+      {id:'b1',n:'Feeding',opts:[{l:'Independent',p:10},{l:'Needs some help',p:5},{l:'Fully dependent',p:0}]},
+      {id:'b2',n:'Transfer (bed ↔ chair)',opts:[{l:'Independent',p:15},{l:'Minor help or supervision',p:10},{l:'Major help, can sit',p:5},{l:'Unable',p:0}]},
+      {id:'b3',n:'Personal grooming',opts:[{l:'Independent',p:5},{l:'Needs help',p:0}]},
+      {id:'b4',n:'Toilet use',opts:[{l:'Independent',p:10},{l:'Some help needed',p:5},{l:'Fully dependent',p:0}]},
+      {id:'b5',n:'Bathing',opts:[{l:'Independent',p:5},{l:'Needs help',p:0}]},
+      {id:'b6',n:'Mobility on level surface',opts:[{l:'Independent > 50 m',p:15},{l:'Help from 1 person > 50 m',p:10},{l:'Wheelchair > 50 m',p:5},{l:'Unable to walk',p:0}]},
+      {id:'b7',n:'Stair climbing',opts:[{l:'Independent',p:10},{l:'Needs help/supervision',p:5},{l:'Unable',p:0}]},
+      {id:'b8',n:'Dressing',opts:[{l:'Independent (≥ half body)',p:10},{l:'Needs help, does ≥50%',p:5},{l:'Fully dependent',p:0}]},
+      {id:'b9',n:'Bowel control',opts:[{l:'No accidents',p:10},{l:'Occasional incontinence',p:5},{l:'Incontinent',p:0}]},
+      {id:'b10',n:'Bladder control',opts:[{l:'Fully continent',p:10},{l:'Occasional incontinence',p:5},{l:'Incontinent / catheter',p:0}]},
+    ],
+    interp(s){if(s>=85)return'l';if(s>=60)return'm';if(s>=40)return'h';return'v';},
+    lv:[{k:'l',lbl:'Independent',pr:'85–100',r:'85–100'},{k:'m',lbl:'Moderate dependence',pr:'60–84',r:'60–84'},{k:'h',lbl:'Severe dependence',pr:'40–59',r:'40–59'},{k:'v',lbl:'Total dependence',pr:'<40',r:'<40'}],
+    rec:{l:'Functionally independent.',m:'Physio / OT support for selected activities.',h:'Significant nursing support. Rehabilitation programme.',v:'Full nursing care or institutionalisation.'}},
+  qsofa:{tab:'qSOFA',eye:'Sepsis',name:'qSOFA Score',desc:'Mortality risk in suspected infection outside ICU. Score ≥ 2 = high risk.',kind:'cb',max:3,
+    cr:[{id:'q1',n:'Altered mental status',s:'GCS < 15 or new confusion',p:1},{id:'q2',n:'Respiratory rate ≥ 22/min',p:1},{id:'q3',n:'Systolic BP ≤ 100 mmHg',p:1}],
+    interp(s){return s<2?'l':'h';},
+    lv:[{k:'l',lbl:'Low risk',pr:'Low mortality',r:'0–1'},{k:'h',lbl:'High risk',pr:'3–14× higher mortality',r:'≥2'}],
+    rec:{l:'Monitor and reassess.',h:'Full sepsis workup. Cultures, antibiotics, full SOFA, consider ICU.'}},
+  cg:{tab:'CrCl',eye:'Renal Function',name:'Cockcroft-Gault',desc:'Creatinine clearance for drug dosing.',kind:'cg'},
+  mdrd:{tab:'MDRD',eye:'Renal Function',name:'MDRD GFR',desc:'Estimated GFR. No body weight required.',kind:'mdrd'},
+};
+
+let active='geneva';
+const sel={};
+const nums={cg:{sex:'m',wt:null,cr:null},mdrd:{sex:'m',race:'other',cr:null}};
+const ageState={};
+let expanded=false;
+Object.keys(S).forEach(k=>sel[k]={});
+
+const CM={l:{dot:'dl',txt:'tl',bg:'bgl',bar:'#10b981'},m:{dot:'dm',txt:'tm',bg:'bgm',bar:'#f59e0b'},h:{dot:'dh',txt:'th',bg:'bgh',bar:'#f97316'},v:{dot:'dv',txt:'tv',bg:'bgv',bar:'#ef4444'}};
+
+function tot(id){return Object.values(sel[id]).reduce((a,b)=>a+b,0);}
+
+function renderTabs(){
+  document.getElementById('scoreBar').innerHTML=Object.entries(S).map(([id,s])=>{
+    const t=tot(id),has=t>0||Object.keys(sel[id]).length>0||ageState[id];
+    return`<button class="stab${id===active?' on':''}${has?' scored':''}" onclick="sw('${id}')">${s.tab}<span class="stab-n">${s.kind==='cg'||s.kind==='mdrd'?'':t}</span></button>`;
+  }).join('');
+}
+
+function sw(id){active=id;expanded=false;renderTabs();renderBody();renderResult();}
+
+function ageH(scoreId){
+  const ranges=AGE_RANGES[scoreId]||[];
+  const cur=ageState[scoreId]||null;
+  const curPts=cur?ranges.find(r=>r.id===cur)?.pts:null;
+  const pts=curPts===null||curPts===undefined?'—':(curPts===0?'0':'+'+curPts);
+  return`<div class="age-wrap">
+    <div class="age-top"><div class="age-ico">Age</div><div class="age-lbl">Age range</div><span class="age-pts${!curPts?' zero':''}">${pts}</span></div>
+    <div class="age-opts">${ranges.map(r=>`<div class="age-opt${cur===r.id?' on':''}" onclick="selAge('${scoreId}','${r.id}',${r.pts})">${r.lbl}<span class="sub">${r.sub}${r.pts!==null?' · '+(r.pts===0?'0':'+'+r.pts):''}</span></div>`).join('')}</div>
+  </div>`;
+}
+
+function critH(c){
+  const on=sel[active][c.id]!==undefined;
+  return`<div class="crit${on?' on':''}" onclick="tog('${c.id}',${c.p})">
+    <div class="c-pts">+${c.p}</div>
+    <div class="c-body"><div class="c-name">${c.n}</div>${c.s?`<div class="c-sub">${c.s}</div>`:''}</div>
+    <div class="c-chk"><div class="ck"><svg viewBox="0 0 9 9" fill="none" stroke="white" stroke-width="2"><polyline points="1,4.5 3.5,7 8,2"/></svg></div></div>
+  </div>`;
+}
+
+function bH(it){
+  const cur=sel['barthel'][it.id]!==undefined?sel['barthel'][it.id]:null;
+  return`<div class="bblk"><div class="bhdr"><span class="bhn">${it.n}</span><span class="bpill">${cur!==null?cur:'–'} pts</span></div>
+    ${it.opts.map(o=>`<div class="bopt${cur===o.p?' on':''}" onclick="selB('${it.id}',${o.p})"><div class="brad"><div class="bdot"></div></div><div class="botxt">${o.l}</div><div class="bop">${o.p}</div></div>`).join('')}
+  </div>`;
+}
+
+function sexH(key){
+  const n=nums[key];
+  return`<div class="crit-wrap"><div class="crit${n.sex==='m'?' on':''}" onclick="nums.${key}.sex='m';renderBody();renderResult()"><div class="c-pts">♂</div><div class="c-body"><div class="c-name">Male</div></div><div class="c-chk"><div class="ck"><svg viewBox="0 0 9 9" fill="none" stroke="white" stroke-width="2"><polyline points="1,4.5 3.5,7 8,2"/></svg></div></div></div>
+  <div class="crit${n.sex==='f'?' on':''}" onclick="nums.${key}.sex='f';renderBody();renderResult()"><div class="c-pts">♀</div><div class="c-body"><div class="c-name">Female</div></div><div class="c-chk"><div class="ck"><svg viewBox="0 0 9 9" fill="none" stroke="white" stroke-width="2"><polyline points="1,4.5 3.5,7 8,2"/></svg></div></div></div></div>`;
+}
+
+function cgH(){
+  const n=nums.cg;
+  return`<div class="slbl">Age</div>${ageH('cg')}
+    <div class="slbl">Parameters</div>
+    <div class="nrow"><div class="nlbl">Weight</div><input class="nfld" type="number" inputmode="decimal" id="cg_w" value="${n.wt||''}" oninput="sn()"><span class="nunit">kg</span></div>
+    <div class="nrow"><div class="nlbl">Creatinine</div><input class="nfld" type="number" step="0.1" inputmode="decimal" id="cg_c" value="${n.cr||''}" oninput="sn()"><span class="nunit">mg/dL</span></div>
+    <div class="slbl">Sex</div>${sexH('cg')}`;
+}
+
+function mdrdH(){
+  const n=nums.mdrd;
+  return`<div class="slbl">Age</div>${ageH('mdrd')}
+    <div class="slbl">Parameters</div>
+    <div class="nrow"><div class="nlbl">Creatinine</div><input class="nfld" type="number" step="0.1" inputmode="decimal" id="mr_c" value="${n.cr||''}" oninput="sm()"><span class="nunit">mg/dL</span></div>
+    <div class="slbl">Sex</div>${sexH('mdrd')}
+    <div class="slbl">Race</div><div class="crit-wrap">
+      <div class="crit${n.race!=='aa'?' on':''}" onclick="nums.mdrd.race='other';renderBody();renderResult()"><div class="c-pts" style="font-size:9px">White</div><div class="c-body"><div class="c-name">White / Other</div></div><div class="c-chk"><div class="ck"><svg viewBox="0 0 9 9" fill="none" stroke="white" stroke-width="2"><polyline points="1,4.5 3.5,7 8,2"/></svg></div></div></div>
+      <div class="crit${n.race==='aa'?' on':''}" onclick="nums.mdrd.race='aa';renderBody();renderResult()"><div class="c-pts" style="font-size:9px">Black</div><div class="c-body"><div class="c-name">African American</div></div><div class="c-chk"><div class="ck"><svg viewBox="0 0 9 9" fill="none" stroke="white" stroke-width="2"><polyline points="1,4.5 3.5,7 8,2"/></svg></div></div></div>
+    </div>`;
+}
+
+function renderBody(){
+  const sc=S[active];
+  let h=`<div class="s-head"><div class="s-eye">${sc.eye}</div><div class="s-name">${sc.name}</div><div class="s-desc">${sc.desc}</div></div>`;
+  if(sc.kind==='cb'){h+=`<div class="slbl">Criteria</div><div class="crit-wrap">${sc.cr.map(critH).join('')}</div>`;}
+  else if(sc.kind==='age_cb'){h+=`<div class="slbl">Age</div>${ageH(active)}<div class="slbl">Clinical criteria</div><div class="crit-wrap">${sc.cr.map(critH).join('')}</div>`;}
+  else if(sc.kind==='age_sec'){h+=`<div class="slbl">Age</div>${ageH(active)}`;sc.sec.forEach(s=>{h+=`<div class="slbl">${s.lbl}</div><div class="crit-wrap">${s.cr.map(critH).join('')}</div>`;});}
+  else if(sc.kind==='barthel'){h+=`<div class="slbl">Activities of Daily Living</div><div class="b-wrap">${sc.items.map(bH).join('')}</div>`;}
+  else if(sc.kind==='cg'){h+=cgH();}
+  else if(sc.kind==='mdrd'){h+=mdrdH();}
+  document.getElementById('scrollBody').innerHTML=h;
+}
+
+function tog(id,p){if(sel[active][id]!==undefined)delete sel[active][id];else sel[active][id]=p;renderTabs();renderBody();renderResult();}
+function selB(id,p){sel['barthel'][id]=p;renderTabs();renderBody();renderResult();}
+function selAge(sid,rid,pts){
+  const ranges=AGE_RANGES[sid]||[];
+  ranges.forEach(r=>delete sel[sid][r.id]);
+  if(ageState[sid]===rid){ageState[sid]=null;}
+  else{ageState[sid]=rid;if(pts>0)sel[sid][rid]=pts;}
+  renderTabs();renderBody();renderResult();
+}
+function sn(){const w=document.getElementById('cg_w'),c=document.getElementById('cg_c');if(w)nums.cg.wt=parseFloat(w.value)||null;if(c)nums.cg.cr=parseFloat(c.value)||null;renderResult();}
+function sm(){const c=document.getElementById('mr_c');if(c)nums.mdrd.cr=parseFloat(c.value)||null;renderResult();}
+
+function getAge(id){const rid=ageState[id];return rid?AGE_VAL[rid]||null:null;}
+function calcCG(){const age=getAge('cg'),n=nums.cg;if(!age||!n.wt||!n.cr)return null;return((140-age)*n.wt)/(72*n.cr)*(n.sex==='f'?0.85:1);}
+function calcMDRD(){const age=getAge('mdrd'),n=nums.mdrd;if(!age||!n.cr)return null;let g=186*Math.pow(n.cr,-1.154)*Math.pow(age,-0.203);if(n.sex==='f')g*=0.742;if(n.race==='aa')g*=1.212;return g;}
+function gfr2k(g){if(g>=60)return'l';if(g>=30)return'm';return'h';}
+function gfrStage(g){if(g>=90)return'G1';if(g>=60)return'G2';if(g>=45)return'G3a';if(g>=30)return'G3b';if(g>=15)return'G4';return'G5';}
+function gfrLbl(g){if(g>=90)return'Normal';if(g>=60)return'Mildly decreased';if(g>=45)return'Mild–moderate';if(g>=30)return'Moderate–severe';if(g>=15)return'Severely decreased';return'Kidney failure';}
+function gfrRec(g){if(g>=60)return'Normal renal function. Standard doses apply.';if(g>=30)return'Moderate impairment. Dose adjustment needed for anticoagulants (LMWH, DOACs).';return'Severe impairment. Avoid LMWH without anti-Xa monitoring. Most DOACs contraindicated.';}
+
+function renderResult(){
+  const sc=S[active];
+  const nEl=document.getElementById('resN');
+  const maxEl=document.getElementById('resMax');
+  const pillEl=document.getElementById('resPill');
+  const detEl=document.getElementById('resDetail');
+
+  if(sc.kind==='cg'||sc.kind==='mdrd'){
+    const v=sc.kind==='cg'?calcCG():calcMDRD();
+    if(!v){nEl.textContent='–';maxEl.textContent='';pillEl.textContent='';pillEl.className='res-pill';detEl.innerHTML='<p style="font-size:12px;color:var(--muted)">Enter parameters to calculate</p>';return;}
+    const gfr=Math.round(v),k=gfr2k(gfr),cm=CM[k];
+    const unit=sc.kind==='cg'?'mL/min':'mL/min/1.73m²';
+    nEl.textContent=gfr;maxEl.textContent=' '+unit;
+    pillEl.textContent=gfrStage(gfr)+' — '+gfrLbl(gfr);pillEl.className=`res-pill ${cm.bg} ${cm.txt}`;
+    detEl.innerHTML=`<div class="recbox ${cm.bg}" style="border-color:${cm.bar}44"><div class="rectitle ${cm.txt}">Clinical significance</div><div class="rectxt">${gfrRec(gfr)}</div></div><div class="disc">⚠ Decision support only. Clinical judgement is the physician's responsibility.</div>`;
+    return;
+  }
+
+  const t=tot(active);
+  if(t===0&&Object.keys(sel[active]).length===0){
+    nEl.textContent='–';maxEl.textContent='';pillEl.textContent='';pillEl.className='res-pill';
+    detEl.innerHTML='<p style="font-size:12px;color:var(--muted)">Select criteria to see assessment</p>';
+    return;
+  }
+  const rk=sc.interp(t),lv=sc.lv.find(l=>l.k===rk),cm=CM[rk];
+  const pct=Math.min(100,Math.round(t/sc.max*100));
+  nEl.textContent=t;maxEl.textContent=' / '+sc.max;
+  pillEl.textContent=lv.lbl;pillEl.className=`res-pill ${cm.bg} ${cm.txt}`;
+  const rows=sc.lv.map(l2=>`<div class="irow${l2.k===rk?' cur':''}"><span class="irng">${l2.r}</span><span class="irisk">${l2.lbl}</span><span class="ipct">${l2.pr}</span></div>`).join('');
+  detEl.innerHTML=`<div class="res-bar-wrap"><div class="res-bar-fill" style="width:${pct}%;background:${cm.bar}"></div></div>
+    <div class="risk-row ${cm.bg}"><div class="rdot ${cm.dot}"></div><div class="rlbl ${cm.txt}">${lv.lbl}</div><div class="rpct ${cm.txt}">${lv.pr}</div></div>
+    <div class="itbl"><div class="ittl">Score interpretation</div>${rows}</div>
+    <div class="recbox ${cm.bg}" style="border-color:${cm.bar}44"><div class="rectitle ${cm.txt}">Recommendation</div><div class="rectxt">${sc.rec[rk]}</div></div>
+    <div class="disc">⚠ Decision support only. Clinical judgement is the physician's responsibility.</div>`;
+}
+
+function toggleExp(){
+  expanded=!expanded;
+  document.getElementById('resDetail').classList.toggle('open',expanded);
+  document.getElementById('resChev').classList.toggle('open',expanded);
+}
+
+function reset(){Object.keys(S).forEach(k=>{sel[k]={};delete ageState[k];});nums.cg={sex:'m',wt:null,cr:null};nums.mdrd={sex:'m',race:'other',cr:null};expanded=false;renderTabs();renderBody();renderResult();}
+
+renderTabs();renderBody();renderResult();
+</script>
+</body>
+</html>
